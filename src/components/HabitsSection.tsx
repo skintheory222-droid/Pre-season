@@ -23,6 +23,159 @@ function calculateStreak(habitId: string, currentDay: number, allLogs: HabitLog[
   return streak;
 }
 
+function HabitHistoryModal({
+  habits,
+  allHabitLogs,
+  currentDay,
+  onClose,
+}: {
+  habits: Habit[];
+  allHabitLogs: HabitLog[];
+  currentDay: number;
+  onClose: () => void;
+}) {
+  const startDay = Math.max(1, currentDay - 29);
+  const days: number[] = [];
+  for (let d = startDay; d <= currentDay; d++) days.push(d);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#1a1820",
+          borderRadius: 16,
+          padding: 24,
+          width: "100%",
+          maxWidth: 700,
+          maxHeight: "85vh",
+          overflow: "auto",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Habit History</h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              color: "var(--text-secondary)",
+              width: 28,
+              height: 28,
+              fontSize: 14,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    position: "sticky",
+                    left: 0,
+                    background: "#1a1820",
+                    zIndex: 2,
+                    padding: "4px 12px 4px 0",
+                    textAlign: "left",
+                    fontSize: 11,
+                    color: "var(--text-subtle)",
+                    fontWeight: 500,
+                    minWidth: 100,
+                  }}
+                />
+                {days.map((d) => (
+                  <th
+                    key={d}
+                    style={{
+                      padding: "4px 2px",
+                      fontSize: 10,
+                      fontWeight: d === currentDay ? 700 : 400,
+                      color: d === currentDay ? "#a99de0" : "var(--text-subtle)",
+                      textAlign: "center",
+                      minWidth: 20,
+                    }}
+                  >
+                    {d}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {habits.map((habit) => (
+                <tr key={habit.id}>
+                  <td
+                    style={{
+                      position: "sticky",
+                      left: 0,
+                      background: "#1a1820",
+                      zIndex: 1,
+                      padding: "4px 12px 4px 0",
+                      fontSize: 12,
+                      color: "var(--text-primary)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {habit.name}
+                  </td>
+                  {days.map((d) => {
+                    const log = allHabitLogs.find(
+                      (l) => l.habit_id === habit.id && l.day_number === d
+                    );
+                    const done = log?.completed || false;
+                    const isToday = d === currentDay;
+                    return (
+                      <td key={d} style={{ padding: "3px 2px", textAlign: "center" }}>
+                        <div
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 3,
+                            margin: "0 auto",
+                            background: done
+                              ? "#a99de0"
+                              : isToday
+                                ? "rgba(169, 157, 224, 0.15)"
+                                : "rgba(255,255,255,0.04)",
+                            border: isToday && !done
+                              ? "1px solid rgba(169, 157, 224, 0.3)"
+                              : "1px solid transparent",
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HabitsSection({
   habits,
   habitLogs,
@@ -34,6 +187,7 @@ export default function HabitsSection({
 }: Props) {
   const [newHabit, setNewHabit] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <div
@@ -44,28 +198,56 @@ export default function HabitsSection({
         overflow: "hidden",
       }}
     >
-      <button
-        onClick={() => setCollapsed(!collapsed)}
+      <div
         style={{
-          width: "100%",
-          padding: "14px 16px",
-          background: "transparent",
-          border: "none",
-          color: "var(--text-primary)",
-          fontSize: 15,
-          fontWeight: 600,
-          textAlign: "left",
-          cursor: "pointer",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
+          padding: "14px 16px",
         }}
       >
-        <span>Daily Habits</span>
-        <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>
-          {collapsed ? "▸" : "▾"}
-        </span>
-      </button>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            color: "var(--text-primary)",
+            fontSize: 15,
+            fontWeight: 600,
+            textAlign: "left",
+            cursor: "pointer",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 0,
+          }}
+        >
+          <span>Daily Habits</span>
+          <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
+        </button>
+        <button
+          onClick={() => setShowHistory(true)}
+          title="Habit history"
+          style={{
+            marginLeft: 8,
+            width: 28,
+            height: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            color: "var(--text-subtle)",
+            fontSize: 14,
+            cursor: "pointer",
+          }}
+        >
+          ▦
+        </button>
+      </div>
 
       {!collapsed && (
         <div style={{ padding: "0 16px 16px" }}>
@@ -179,6 +361,15 @@ export default function HabitsSection({
             </button>
           </div>
         </div>
+      )}
+
+      {showHistory && (
+        <HabitHistoryModal
+          habits={habits}
+          allHabitLogs={allHabitLogs}
+          currentDay={currentDay}
+          onClose={() => setShowHistory(false)}
+        />
       )}
     </div>
   );
