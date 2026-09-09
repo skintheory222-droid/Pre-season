@@ -7,6 +7,7 @@ interface Props {
   task: Task;
   index: number;
   totalTasks: number;
+  isBonus?: boolean;
   onToggleSubtask: (subtaskId: string) => void;
   onToggleTask: () => void;
   onEdit: () => void;
@@ -19,6 +20,7 @@ export default function TaskCard({
   task,
   index,
   totalTasks,
+  isBonus,
   onToggleSubtask,
   onToggleTask,
   onEdit,
@@ -28,6 +30,7 @@ export default function TaskCard({
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [infoSubtaskId, setInfoSubtaskId] = useState<string | null>(null);
 
   const typeInfo = TASK_TYPES[task.type] || TASK_TYPES.break;
   const doneCount = task.subtasks.filter((s) => s.done).length;
@@ -41,9 +44,11 @@ export default function TaskCard({
         background: typeInfo.bg,
         borderRadius: 12,
         marginBottom: 8,
-        border: `1px solid ${isComplete ? typeInfo.accent + "30" : "var(--border)"}`,
+        border: isBonus
+          ? `1px dashed ${typeInfo.accent}40`
+          : `1px solid ${isComplete ? typeInfo.accent + "30" : "var(--border)"}`,
         overflow: "hidden",
-        opacity: isComplete ? 0.7 : 1,
+        opacity: isBonus ? 0.7 : isComplete ? 0.7 : 1,
         transition: "opacity 0.2s",
       }}
     >
@@ -87,23 +92,47 @@ export default function TaskCard({
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Type tag */}
-          <span
-            style={{
-              display: "inline-block",
-              fontSize: 10,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: typeInfo.accent,
-              background: typeInfo.accent + "18",
-              padding: "2px 8px",
-              borderRadius: 4,
-              marginBottom: 6,
-            }}
-          >
-            {typeInfo.label}
-          </span>
+          {/* Type tag and playlist link */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <span
+              style={{
+                display: "inline-block",
+                fontSize: 10,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: typeInfo.accent,
+                background: typeInfo.accent + "18",
+                padding: "2px 8px",
+                borderRadius: 4,
+              }}
+            >
+              {typeInfo.label}
+            </span>
+            {task.youtube_playlist_url && (
+              <a
+                href={task.youtube_playlist_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  background: typeInfo.accent + "20",
+                  color: typeInfo.accent,
+                  fontSize: 11,
+                  textDecoration: "none",
+                }}
+                title="Open playlist"
+              >
+                ▶
+              </a>
+            )}
+          </div>
 
           <h3
             style={{
@@ -200,53 +229,123 @@ export default function TaskCard({
       {expanded && task.subtasks.length > 0 && (
         <div style={{ padding: "0 16px 14px", borderTop: "1px solid var(--border)" }}>
           {task.subtasks.map((sub) => (
-            <div
-              key={sub.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                padding: "10px 0",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <button
-                onClick={() => onToggleSubtask(sub.id)}
+            <div key={sub.id}>
+              <div
                 style={{
-                  width: 18,
-                  height: 18,
-                  minWidth: 18,
-                  borderRadius: 4,
-                  border: `2px solid ${sub.done ? typeInfo.accent : "var(--text-subtle)"}`,
-                  background: sub.done ? typeInfo.accent : "transparent",
-                  cursor: "pointer",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginTop: 1,
-                  color: sub.done ? "#000" : "transparent",
-                  fontSize: 10,
-                  fontWeight: 700,
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: "10px 0",
+                  borderBottom: "1px solid var(--border)",
                 }}
               >
-                {sub.done && "✓"}
-              </button>
-              <div style={{ flex: 1 }}>
-                <span
+                <button
+                  onClick={() => onToggleSubtask(sub.id)}
                   style={{
-                    fontSize: 13,
-                    color: sub.done ? "var(--text-subtle)" : "var(--text-primary)",
-                    textDecoration: sub.done ? "line-through" : "none",
+                    width: 18,
+                    height: 18,
+                    minWidth: 18,
+                    borderRadius: 4,
+                    border: `2px solid ${sub.done ? typeInfo.accent : "var(--text-subtle)"}`,
+                    background: sub.done ? typeInfo.accent : "transparent",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 1,
+                    color: sub.done ? "#000" : "transparent",
+                    fontSize: 10,
+                    fontWeight: 700,
                   }}
                 >
-                  {sub.label}
-                </span>
-                {!sub.done && sub.detail && (
-                  <p style={{ fontSize: 12, color: "var(--text-subtle)", margin: "2px 0 0" }}>
-                    {sub.detail}
-                  </p>
+                  {sub.done && "✓"}
+                </button>
+                <div style={{ flex: 1 }}>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: sub.done ? "var(--text-subtle)" : "var(--text-primary)",
+                      textDecoration: sub.done ? "line-through" : "none",
+                    }}
+                  >
+                    {sub.label}
+                  </span>
+                  {!sub.done && sub.detail && (
+                    <p style={{ fontSize: 12, color: "var(--text-subtle)", margin: "2px 0 0" }}>
+                      {sub.detail}
+                    </p>
+                  )}
+                </div>
+                {(sub.explanation || sub.image_url) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInfoSubtaskId(infoSubtaskId === sub.id ? null : sub.id);
+                    }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      minWidth: 22,
+                      borderRadius: "50%",
+                      border: `1px solid ${infoSubtaskId === sub.id ? typeInfo.accent : "var(--text-subtle)"}`,
+                      background: infoSubtaskId === sub.id ? typeInfo.accent + "20" : "transparent",
+                      color: infoSubtaskId === sub.id ? typeInfo.accent : "var(--text-subtle)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    i
+                  </button>
                 )}
               </div>
+
+              {/* Info panel */}
+              {infoSubtaskId === sub.id && (
+                <div
+                  style={{
+                    padding: "12px",
+                    margin: "4px 0 8px",
+                    background: "rgba(255,255,255,0.03)",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  {sub.image_url && (
+                    <img
+                      src={sub.image_url}
+                      alt={sub.label}
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        borderRadius: 6,
+                        marginBottom: sub.explanation ? 10 : 0,
+                      }}
+                    />
+                  )}
+                  {sub.explanation && (
+                    <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                      {sub.explanation}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setInfoSubtaskId(null)}
+                    style={{
+                      marginTop: 8,
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-subtle)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

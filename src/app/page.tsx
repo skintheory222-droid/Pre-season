@@ -13,6 +13,7 @@ import {
   toggleHabitLog,
   loadSetting,
   saveSetting,
+  seedDefaultHabits,
 } from "@/lib/storage";
 import TaskCard from "@/components/TaskCard";
 import TaskModal from "@/components/TaskModal";
@@ -37,10 +38,13 @@ export default function Dashboard() {
   const [allHabitLogs, setAllHabitLogs] = useState<HabitLog[]>([]);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingBonus, setEditingBonus] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [toast, setToast] = useState("");
   const [jumpInput, setJumpInput] = useState("");
   const [showJump, setShowJump] = useState(false);
+  const [editingPhase, setEditingPhase] = useState(false);
+  const [phaseInput, setPhaseInput] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   const showToast = useCallback((msg: string) => {
@@ -55,6 +59,8 @@ export default function Dashboard() {
         day_number: day,
         phase: getPhase(day),
         tasks: [],
+        bonus_tasks: [],
+        bonus_task_order: [],
         task_order: [],
       }
     );
@@ -72,9 +78,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    refreshDay(currentDay);
-    refreshHabits(currentDay);
-    setLoaded(true);
+    seedDefaultHabits().then(() => {
+      refreshDay(currentDay);
+      refreshHabits(currentDay);
+      setLoaded(true);
+    });
   }, [currentDay, refreshDay, refreshHabits]);
 
   const persistDay = useCallback(
@@ -88,37 +96,56 @@ export default function Dashboard() {
   const handleSaveTask = useCallback(
     async (task: Task) => {
       if (!dayData) return;
-      const tasks = [...dayData.tasks];
-      const idx = tasks.findIndex((t) => t.id === task.id);
-      if (idx >= 0) {
-        tasks[idx] = task;
+      if (editingBonus) {
+        const bonusTasks = [...(dayData.bonus_tasks || [])];
+        const idx = bonusTasks.findIndex((t) => t.id === task.id);
+        if (idx >= 0) bonusTasks[idx] = task;
+        else bonusTasks.push(task);
+        const order = idx >= 0
+          ? (dayData.bonus_task_order || [])
+          : [...(dayData.bonus_task_order || []), task.id];
+        await persistDay({ ...dayData, bonus_tasks: bonusTasks, bonus_task_order: order });
       } else {
-        tasks.push(task);
+        const tasks = [...dayData.tasks];
+        const idx = tasks.findIndex((t) => t.id === task.id);
+        if (idx >= 0) tasks[idx] = task;
+        else tasks.push(task);
+        const order = idx >= 0 ? dayData.task_order : [...dayData.task_order, task.id];
+        await persistDay({ ...dayData, tasks, task_order: order });
       }
-      const order = idx >= 0 ? dayData.task_order : [...dayData.task_order, task.id];
-      await persistDay({ ...dayData, tasks, task_order: order });
       setShowTaskModal(false);
       setEditingTask(null);
+      setEditingBonus(false);
     },
-    [dayData, persistDay]
+    [dayData, persistDay, editingBonus]
   );
 
   const handleDeleteTask = useCallback(
-    async (taskId: string) => {
+    async (taskId: string, isBonus: boolean) => {
       if (!dayData) return;
-      await persistDay({
-        ...dayData,
-        tasks: dayData.tasks.filter((t) => t.id !== taskId),
-        task_order: dayData.task_order.filter((id) => id !== taskId),
-      });
+      if (isBonus) {
+        await persistDay({
+          ...dayData,
+          bonus_tasks: (dayData.bonus_tasks || []).filter((t) => t.id !== taskId),
+          bonus_task_order: (dayData.bonus_task_order || []).filter((id) => id !== taskId),
+        });
+      } else {
+        await persistDay({
+          ...dayData,
+          tasks: dayData.tasks.filter((t) => t.id !== taskId),
+          task_order: dayData.task_order.filter((id) => id !== taskId),
+        });
+      }
     },
     [dayData, persistDay]
   );
 
   const handleToggleSubtask = useCallback(
-    async (taskId: string, subtaskId: string) => {
+    async (taskId: string, subtaskId: string, isBonus: boolean) => {
       if (!dayData) return;
-      const tasks = dayData.tasks.map((t) => {
+      const key = isBonus ? "bonus_tasks" : "tasks";
+      const taskList = isBonus ? (dayData.bonus_tasks || []) : dayData.tasks;
+      const updated = taskList.map((t) => {
         if (t.id !== taskId) return t;
         const subtasks = t.subtasks.map((s) =>
           s.id === subtaskId ? { ...s, done: !s.done } : s
@@ -131,15 +158,17 @@ export default function Dashboard() {
           completed_at: allDone ? new Date().toISOString() : undefined,
         };
       });
-      await persistDay({ ...dayData, tasks });
+      await persistDay({ ...dayData, [key]: updated });
     },
     [dayData, persistDay]
   );
 
   const handleToggleTask = useCallback(
-    async (taskId: string) => {
+    async (taskId: string, isBonus: boolean) => {
       if (!dayData) return;
-      const tasks = dayData.tasks.map((t) => {
+      const key = isBonus ? "bonus_tasks" : "tasks";
+      const taskList = isBonus ? (dayData.bonus_tasks || []) : dayData.tasks;
+      const updated = taskList.map((t) => {
         if (t.id !== taskId) return t;
         const isComplete = t.status === "complete";
         return {
@@ -149,18 +178,19 @@ export default function Dashboard() {
           subtasks: t.subtasks.map((s) => ({ ...s, done: !isComplete })),
         };
       });
-      await persistDay({ ...dayData, tasks });
+      await persistDay({ ...dayData, [key]: updated });
     },
     [dayData, persistDay]
   );
 
   const handleReorder = useCallback(
-    async (fromIndex: number, toIndex: number) => {
+    async (fromIndex: number, toIndex: number, isBonus: boolean) => {
       if (!dayData) return;
-      const order = [...dayData.task_order];
+      const orderKey = isBonus ? "bonus_task_order" : "task_order";
+      const order = [...(isBonus ? (dayData.bonus_task_order || []) : dayData.task_order)];
       const [moved] = order.splice(fromIndex, 1);
       order.splice(toIndex, 0, moved);
-      await persistDay({ ...dayData, task_order: order });
+      await persistDay({ ...dayData, [orderKey]: order });
     },
     [dayData, persistDay]
   );
@@ -174,6 +204,7 @@ export default function Dashboard() {
           return;
         }
         const importedTasks: Task[] = parsed.tasks;
+        const importedBonus: Task[] = parsed.bonus_tasks || [];
         const day = parsed.day || currentDay;
         const phase = parsed.phase || getPhase(day);
 
@@ -183,14 +214,20 @@ export default function Dashboard() {
             phase,
             tasks: importedTasks,
             task_order: importedTasks.map((t) => t.id),
+            bonus_tasks: importedBonus,
+            bonus_task_order: importedBonus.map((t) => t.id),
           });
         } else {
           const existingIds = new Set(dayData.tasks.map((t) => t.id));
           const newTasks = importedTasks.filter((t) => !existingIds.has(t.id));
+          const existingBonusIds = new Set((dayData.bonus_tasks || []).map((t) => t.id));
+          const newBonus = importedBonus.filter((t) => !existingBonusIds.has(t.id));
           await persistDay({
             ...dayData,
             tasks: [...dayData.tasks, ...newTasks],
             task_order: [...dayData.task_order, ...newTasks.map((t) => t.id)],
+            bonus_tasks: [...(dayData.bonus_tasks || []), ...newBonus],
+            bonus_task_order: [...(dayData.bonus_task_order || []), ...newBonus.map((t) => t.id)],
           });
         }
         if (day !== currentDay) setCurrentDay(day);
@@ -203,9 +240,11 @@ export default function Dashboard() {
     [currentDay, dayData, persistDay, showToast]
   );
 
-  const handleExport = useCallback(() => {
-    if (!dayData) return;
+  const buildExportData = useCallback(() => {
+    if (!dayData) return null;
     const incompleteSummary: string[] = [];
+    const allTasksForExport = [...dayData.tasks, ...(dayData.bonus_tasks || [])];
+
     const exportTasks = dayData.tasks.map((t) => {
       const subtasks = t.subtasks.map((s) => ({
         id: s.id,
@@ -217,9 +256,7 @@ export default function Dashboard() {
           ? t.status === "complete"
           : subtasks.every((s) => s.done);
       if (!allDone) {
-        const unfinished = subtasks
-          .filter((s) => !s.done)
-          .map((s) => s.label);
+        const unfinished = subtasks.filter((s) => !s.done).map((s) => s.label);
         incompleteSummary.push(
           `${t.title}: ${unfinished.length ? unfinished.join(", ") : "not done"}`
         );
@@ -234,34 +271,70 @@ export default function Dashboard() {
       };
     });
 
+    const bonusCompleted = (dayData.bonus_tasks || [])
+      .filter((t) => t.status === "complete" || (t.subtasks.length > 0 && t.subtasks.every((s) => s.done)))
+      .map((t) => t.id);
+
+    // Also add incomplete bonus subtasks to summary
+    (dayData.bonus_tasks || []).forEach((t) => {
+      const unfinished = t.subtasks.filter((s) => !s.done).map((s) => s.label);
+      const allDone = t.subtasks.length === 0 ? t.status === "complete" : t.subtasks.every((s) => s.done);
+      if (!allDone && (t.subtasks.length > 0 ? unfinished.length : true)) {
+        incompleteSummary.push(
+          `[Bonus] ${t.title}: ${unfinished.length ? unfinished.join(", ") : "not done"}`
+        );
+      }
+    });
+
     const habitsToday: Record<string, boolean> = {};
     habits.forEach((h) => {
       const log = habitLogs.find((l) => l.habit_id === h.id);
       habitsToday[h.name] = log?.completed || false;
     });
 
-    const exportData = {
+    return {
       day: dayData.day_number,
       phase: dayData.phase,
       exported_at: new Date().toISOString(),
       tasks: exportTasks,
       incomplete_summary: incompleteSummary,
+      bonus_completed: bonusCompleted,
       habits_today: habitsToday,
     };
+  }, [dayData, habits, habitLogs]);
 
+  const handleExport = useCallback(() => {
+    const exportData = buildExportData();
+    if (!exportData) return;
     navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
     showToast("Copied to clipboard");
-  }, [dayData, habits, habitLogs, showToast]);
+  }, [buildExportData, showToast]);
 
-  const orderedTasks = dayData
-    ? dayData.task_order
-        .map((id) => dayData.tasks.find((t) => t.id === id))
-        .filter(Boolean) as Task[]
-    : [];
-  const unorderedTasks = dayData
-    ? dayData.tasks.filter((t) => !dayData.task_order.includes(t.id))
-    : [];
-  const allTasks = [...orderedTasks, ...unorderedTasks];
+  const handleEveningPrep = useCallback(() => {
+    const exportData = buildExportData();
+    if (!exportData) return;
+    const message = `Evening prep — Day ${exportData.day}. Here is my export:\n\n${JSON.stringify(exportData, null, 2)}`;
+    navigator.clipboard.writeText(message);
+    showToast("Evening prep copied to clipboard");
+  }, [buildExportData, showToast]);
+
+  const handlePhaseEdit = useCallback(async () => {
+    if (!dayData || !phaseInput.trim()) return;
+    await persistDay({ ...dayData, phase: phaseInput.trim() });
+    setEditingPhase(false);
+  }, [dayData, phaseInput, persistDay]);
+
+  // Sort tasks by order
+  const sortByOrder = (tasks: Task[], order: string[]) => {
+    const ordered = order
+      .map((id) => tasks.find((t) => t.id === id))
+      .filter(Boolean) as Task[];
+    const unordered = tasks.filter((t) => !order.includes(t.id));
+    return [...ordered, ...unordered];
+  };
+
+  const allTasks = dayData ? sortByOrder(dayData.tasks, dayData.task_order) : [];
+  const bonusTasks = dayData ? sortByOrder(dayData.bonus_tasks || [], dayData.bonus_task_order || []) : [];
 
   const completedCount = allTasks.filter(
     (t) => t.status === "complete" || (t.subtasks.length > 0 && t.subtasks.every((s) => s.done))
@@ -291,9 +364,49 @@ export default function Dashboard() {
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
               Day {currentDay} of 60
             </h1>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>
-              {getPhase(currentDay)}
-            </p>
+            {editingPhase ? (
+              <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+                <input
+                  value={phaseInput}
+                  onChange={(e) => setPhaseInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePhaseEdit()}
+                  autoFocus
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: 4,
+                    color: "var(--text-secondary)",
+                    fontSize: 13,
+                    padding: "2px 6px",
+                    outline: "none",
+                    width: 200,
+                  }}
+                />
+                <button
+                  onClick={handlePhaseEdit}
+                  style={{ ...navBtn, width: 24, height: 24, fontSize: 12 }}
+                >
+                  ✓
+                </button>
+              </div>
+            ) : (
+              <p
+                onClick={() => {
+                  setPhaseInput(dayData?.phase || getPhase(currentDay));
+                  setEditingPhase(true);
+                }}
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: 13,
+                  margin: 0,
+                  cursor: "pointer",
+                  borderBottom: "1px dashed var(--text-subtle)",
+                  display: "inline-block",
+                }}
+              >
+                {dayData?.phase || getPhase(currentDay)}
+              </p>
+            )}
           </div>
           <button onClick={() => setCurrentDay(Math.min(60, currentDay + 1))} style={navBtn}>
             →
@@ -411,15 +524,16 @@ export default function Dashboard() {
               task={task}
               index={index}
               totalTasks={allTasks.length}
-              onToggleSubtask={(subtaskId) => handleToggleSubtask(task.id, subtaskId)}
-              onToggleTask={() => handleToggleTask(task.id)}
+              onToggleSubtask={(subtaskId) => handleToggleSubtask(task.id, subtaskId, false)}
+              onToggleTask={() => handleToggleTask(task.id, false)}
               onEdit={() => {
                 setEditingTask(task);
+                setEditingBonus(false);
                 setShowTaskModal(true);
               }}
-              onDelete={() => handleDeleteTask(task.id)}
-              onMoveUp={() => index > 0 && handleReorder(index, index - 1)}
-              onMoveDown={() => index < allTasks.length - 1 && handleReorder(index, index + 1)}
+              onDelete={() => handleDeleteTask(task.id, false)}
+              onMoveUp={() => index > 0 && handleReorder(index, index - 1, false)}
+              onMoveDown={() => index < allTasks.length - 1 && handleReorder(index, index + 1, false)}
             />
           ))
         )}
@@ -429,6 +543,7 @@ export default function Dashboard() {
       <button
         onClick={() => {
           setEditingTask(null);
+          setEditingBonus(false);
           setShowTaskModal(true);
         }}
         style={{
@@ -445,6 +560,67 @@ export default function Dashboard() {
       >
         + Add Task
       </button>
+
+      {/* Bonus Tasks */}
+      {(bonusTasks.length > 0 || allTasks.length > 0) && (
+        <div style={{ marginBottom: 32 }}>
+          <h2
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: 12,
+              letterSpacing: "0.02em",
+            }}
+          >
+            Bonus — if the energy is there
+          </h2>
+          {bonusTasks.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--text-subtle)", marginBottom: 12 }}>
+              No bonus tasks. Import a day plan with bonus_tasks or add one manually.
+            </p>
+          ) : (
+            bonusTasks.map((task, index) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                index={index}
+                totalTasks={bonusTasks.length}
+                isBonus
+                onToggleSubtask={(subtaskId) => handleToggleSubtask(task.id, subtaskId, true)}
+                onToggleTask={() => handleToggleTask(task.id, true)}
+                onEdit={() => {
+                  setEditingTask(task);
+                  setEditingBonus(true);
+                  setShowTaskModal(true);
+                }}
+                onDelete={() => handleDeleteTask(task.id, true)}
+                onMoveUp={() => index > 0 && handleReorder(index, index - 1, true)}
+                onMoveDown={() => index < bonusTasks.length - 1 && handleReorder(index, index + 1, true)}
+              />
+            ))
+          )}
+          <button
+            onClick={() => {
+              setEditingTask(null);
+              setEditingBonus(true);
+              setShowTaskModal(true);
+            }}
+            style={{
+              width: "100%",
+              padding: "12px",
+              background: "transparent",
+              border: "1px dashed var(--border)",
+              borderRadius: 12,
+              color: "var(--text-subtle)",
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            + Add Bonus Task
+          </button>
+        </div>
+      )}
 
       {/* Habits */}
       <HabitsSection
@@ -471,6 +647,28 @@ export default function Dashboard() {
         }}
       />
 
+      {/* Evening Prep Button */}
+      <button
+        onClick={handleEveningPrep}
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          padding: "12px 20px",
+          background: "#a99de0",
+          border: "none",
+          borderRadius: 12,
+          color: "#111014",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
+          boxShadow: "0 4px 20px rgba(169, 157, 224, 0.3)",
+          zIndex: 50,
+        }}
+      >
+        Start evening prep
+      </button>
+
       {/* Modals */}
       {showTaskModal && (
         <TaskModal
@@ -479,6 +677,7 @@ export default function Dashboard() {
           onClose={() => {
             setShowTaskModal(false);
             setEditingTask(null);
+            setEditingBonus(false);
           }}
         />
       )}

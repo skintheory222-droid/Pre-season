@@ -166,6 +166,28 @@ export async function toggleHabitLog(
   setLocal(LOCAL_HABIT_LOGS_KEY, logs);
 }
 
+const DEFAULT_HABITS = [
+  "Morning Anchor",
+  "Mindfulness",
+  "Step Outside",
+  "Spanish",
+  "Exercise",
+  "Evening Ritual",
+];
+
+export async function seedDefaultHabits(): Promise<void> {
+  const existing = await loadHabits();
+  if (existing.length > 0) return;
+  for (const name of DEFAULT_HABITS) {
+    await saveHabit({
+      id: crypto.randomUUID(),
+      name,
+      active: true,
+      created_at: new Date().toISOString(),
+    });
+  }
+}
+
 export async function loadSetting(key: string): Promise<string | null> {
   if (isSupabaseConfigured()) {
     const { data } = await supabase

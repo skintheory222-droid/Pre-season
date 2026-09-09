@@ -10,12 +10,16 @@ export type TaskType =
   | "deep_listening"
   | "arrangement"
   | "mixing"
+  | "mindfulness"
+  | "outside"
   | "break";
 
 export interface Subtask {
   id: string;
   label: string;
   detail?: string;
+  explanation?: string;
+  image_url?: string;
   done?: boolean;
 }
 
@@ -24,6 +28,7 @@ export interface Task {
   type: TaskType;
   title: string;
   description?: string;
+  youtube_playlist_url?: string;
   status?: "complete" | "incomplete";
   subtasks: Subtask[];
   completed_at?: string;
@@ -34,6 +39,8 @@ export interface DayData {
   day_number: number;
   phase: string;
   tasks: Task[];
+  bonus_tasks: Task[];
+  bonus_task_order: string[];
   task_order: string[];
   created_at?: string;
   updated_at?: string;
@@ -73,5 +80,7 @@ export const TASK_TYPES: Record<
   },
   arrangement: { label: "Arrangement", accent: "#e0c870", bg: "#2a281e" },
   mixing: { label: "Mixing", accent: "#70e0a0", bg: "#1e2a22" },
+  mindfulness: { label: "Mindfulness", accent: "#e070a0", bg: "#2a1e24" },
+  outside: { label: "Outside", accent: "#a0d070", bg: "#1e2a1e" },
   break: { label: "Break", accent: "#8a8a8a", bg: "#1e1e1e" },
 };

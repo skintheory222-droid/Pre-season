@@ -13,6 +13,7 @@ export default function TaskModal({ task, onSave, onClose }: Props) {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [type, setType] = useState<TaskType>(task?.type || "ritual");
+  const [youtubePlaylist, setYoutubePlaylist] = useState(task?.youtube_playlist_url || "");
   const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks || []);
   const [newSubLabel, setNewSubLabel] = useState("");
   const [newSubDetail, setNewSubDetail] = useState("");
@@ -43,6 +44,7 @@ export default function TaskModal({ task, onSave, onClose }: Props) {
       type,
       title: title.trim(),
       description: description.trim() || undefined,
+      youtube_playlist_url: youtubePlaylist.trim() || undefined,
       subtasks,
       status: task?.status || "incomplete",
       completed_at: task?.completed_at,
@@ -84,6 +86,14 @@ export default function TaskModal({ task, onSave, onClose }: Props) {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Optional description"
           style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
+        />
+
+        <label style={labelStyle}>YouTube Playlist URL</label>
+        <input
+          value={youtubePlaylist}
+          onChange={(e) => setYoutubePlaylist(e.target.value)}
+          placeholder="https://youtube.com/playlist?list=..."
+          style={inputStyle}
         />
 
         <label style={labelStyle}>Subtasks</label>

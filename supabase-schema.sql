@@ -5,7 +5,9 @@ create table if not exists days (
   day_number integer unique not null check (day_number between 1 and 60),
   phase text not null,
   tasks jsonb not null default '[]'::jsonb,
+  bonus_tasks jsonb not null default '[]'::jsonb,
   task_order text[] not null default '{}',
+  bonus_task_order text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
