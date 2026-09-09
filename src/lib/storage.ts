@@ -166,22 +166,41 @@ export async function toggleHabitLog(
   setLocal(LOCAL_HABIT_LOGS_KEY, logs);
 }
 
-const DEFAULT_HABITS = [
-  "Morning Anchor",
-  "Mindfulness",
-  "Step Outside",
-  "Spanish",
-  "Exercise",
-  "Evening Ritual",
+const DEFAULT_HABITS: { name: string; explanation: string }[] = [
+  {
+    name: "Morning Anchor",
+    explanation: "Your non-negotiable startup sequence. Muse time, feet outside, mindfulness practice, hygiene, fuel, read today’s menu. The order is flexible — what matters is that all five happen before you start work blocks.",
+  },
+  {
+    name: "Mindfulness",
+    explanation: "Ten minutes, your choice of form. Breathwork if you need grounding. Movement or dance if you need activation. Somatic if you need to feel into your body slowly. Stillness if you need quiet. The choice itself is the practice — read your body and respond.",
+  },
+  {
+    name: "Step Outside",
+    explanation: "Two minutes, no phone, just air. Before or after anything else. This is non-negotiable and it takes two minutes. Just go stand in it.",
+  },
+  {
+    name: "Spanish",
+    explanation: "One Duolingo lesson minimum. Task type was pre-decided during Launchpad the night before. Open the app, do the next thing it gives you.",
+  },
+  {
+    name: "Exercise",
+    explanation: "Four day rotation — Yoga, Dance, Somatic Movement, Body Weight. Check which day of the rotation you’re on. Video pre-selected during Launchpad. Ten minutes minimum.",
+  },
+  {
+    name: "Evening Ritual",
+    explanation: "This is Launchpad. Open a new Claude chat, type Launchpad, paste your export JSON. The conversation walks you through everything. This closes the day and loads tomorrow.",
+  },
 ];
 
 export async function seedDefaultHabits(): Promise<void> {
   const existing = await loadHabits();
   if (existing.length > 0) return;
-  for (const name of DEFAULT_HABITS) {
+  for (const h of DEFAULT_HABITS) {
     await saveHabit({
       id: crypto.randomUUID(),
-      name,
+      name: h.name,
+      explanation: h.explanation,
       active: true,
       created_at: new Date().toISOString(),
     });

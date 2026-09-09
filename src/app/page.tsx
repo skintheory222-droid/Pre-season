@@ -645,6 +645,10 @@ export default function Dashboard() {
           await deleteHabit(id);
           refreshHabits(currentDay);
         }}
+        onUpdateHabit={async (habit) => {
+          await saveHabit(habit);
+          refreshHabits(currentDay);
+        }}
       />
 
       {/* Evening Prep Button */}

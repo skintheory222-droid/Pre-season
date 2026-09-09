@@ -49,6 +49,7 @@ export interface DayData {
 export interface Habit {
   id: string;
   name: string;
+  explanation?: string;
   active: boolean;
   created_at?: string;
 }

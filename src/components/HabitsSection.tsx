@@ -11,6 +11,7 @@ interface Props {
   onToggle: (habitId: string, completed: boolean) => void;
   onAddHabit: (name: string) => void;
   onDeleteHabit: (id: string) => void;
+  onUpdateHabit: (habit: Habit) => void;
 }
 
 function calculateStreak(habitId: string, currentDay: number, allLogs: HabitLog[]): number {
@@ -184,10 +185,31 @@ export default function HabitsSection({
   onToggle,
   onAddHabit,
   onDeleteHabit,
+  onUpdateHabit,
 }: Props) {
   const [newHabit, setNewHabit] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedInfoId, setExpandedInfoId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editExplanation, setEditExplanation] = useState("");
+
+  const startEdit = (habit: Habit) => {
+    setEditingId(habit.id);
+    setEditName(habit.name);
+    setEditExplanation(habit.explanation || "");
+  };
+
+  const saveEdit = (habit: Habit) => {
+    if (!editName.trim()) return;
+    onUpdateHabit({
+      ...habit,
+      name: editName.trim(),
+      explanation: editExplanation.trim() || undefined,
+    });
+    setEditingId(null);
+  };
 
   return (
     <div
@@ -260,58 +282,204 @@ export default function HabitsSection({
               const log = habitLogs.find((l) => l.habit_id === habit.id);
               const checked = log?.completed || false;
               const streak = calculateStreak(habit.id, currentDay, allHabitLogs);
+              const isEditing = editingId === habit.id;
+              const isInfoOpen = expandedInfoId === habit.id;
 
               return (
-                <div
-                  key={habit.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 0",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <button
-                    onClick={() => onToggle(habit.id, !checked)}
+                <div key={habit.id}>
+                  <div
                     style={{
-                      width: 18,
-                      height: 18,
-                      minWidth: 18,
-                      borderRadius: 4,
-                      border: `2px solid ${checked ? "#a99de0" : "var(--text-subtle)"}`,
-                      background: checked ? "#a99de0" : "transparent",
-                      cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      color: checked ? "#000" : "transparent",
-                      fontSize: 10,
-                      fontWeight: 700,
+                      gap: 10,
+                      padding: "8px 0",
+                      borderBottom: "1px solid var(--border)",
                     }}
                   >
-                    {checked && "✓"}
-                  </button>
-                  <span style={{ flex: 1, fontSize: 13, color: "var(--text-primary)" }}>
-                    {habit.name}
-                  </span>
-                  {streak > 0 && (
-                    <span style={{ fontSize: 11, color: "#a99de0", fontWeight: 500 }}>
-                      {streak}d streak
+                    <button
+                      onClick={() => onToggle(habit.id, !checked)}
+                      style={{
+                        width: 18,
+                        height: 18,
+                        minWidth: 18,
+                        borderRadius: 4,
+                        border: `2px solid ${checked ? "#a99de0" : "var(--text-subtle)"}`,
+                        background: checked ? "#a99de0" : "transparent",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: checked ? "#000" : "transparent",
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {checked && "✓"}
+                    </button>
+                    <span style={{ flex: 1, fontSize: 13, color: "var(--text-primary)" }}>
+                      {habit.name}
                     </span>
+                    {streak > 0 && (
+                      <span style={{ fontSize: 11, color: "#a99de0", fontWeight: 500 }}>
+                        {streak}d streak
+                      </span>
+                    )}
+                    {habit.explanation && (
+                      <button
+                        onClick={() => setExpandedInfoId(isInfoOpen ? null : habit.id)}
+                        style={{
+                          width: 22,
+                          height: 22,
+                          minWidth: 22,
+                          borderRadius: "50%",
+                          border: `1px solid ${isInfoOpen ? "#a99de0" : "var(--text-subtle)"}`,
+                          background: isInfoOpen ? "rgba(169, 157, 224, 0.15)" : "transparent",
+                          color: isInfoOpen ? "#a99de0" : "var(--text-subtle)",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        i
+                      </button>
+                    )}
+                    <button
+                      onClick={() => startEdit(habit)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-subtle)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={() => onDeleteHabit(habit.id)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-subtle)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Info panel */}
+                  {isInfoOpen && habit.explanation && (
+                    <div
+                      style={{
+                        padding: 12,
+                        margin: "4px 0 8px",
+                        background: "rgba(255,255,255,0.03)",
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                        {habit.explanation}
+                      </p>
+                      <button
+                        onClick={() => setExpandedInfoId(null)}
+                        style={{
+                          marginTop: 8,
+                          background: "transparent",
+                          border: "none",
+                          color: "var(--text-subtle)",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={() => onDeleteHabit(habit.id)}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-subtle)",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ✕
-                  </button>
+
+                  {/* Edit panel */}
+                  {isEditing && (
+                    <div
+                      style={{
+                        padding: 12,
+                        margin: "4px 0 8px",
+                        background: "rgba(255,255,255,0.03)",
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Habit name"
+                        autoFocus
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          color: "var(--text-primary)",
+                          fontSize: 13,
+                          outline: "none",
+                          marginBottom: 8,
+                        }}
+                      />
+                      <textarea
+                        value={editExplanation}
+                        onChange={(e) => setEditExplanation(e.target.value)}
+                        placeholder="Explanation (optional)"
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          color: "var(--text-primary)",
+                          fontSize: 12,
+                          outline: "none",
+                          minHeight: 60,
+                          resize: "vertical",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          style={{
+                            padding: "6px 14px",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            color: "var(--text-secondary)",
+                            fontSize: 12,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => saveEdit(habit)}
+                          style={{
+                            padding: "6px 14px",
+                            background: "#a99de0",
+                            border: "none",
+                            borderRadius: 6,
+                            color: "#111014",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
